@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Interviewer</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <main class="app">
+    <section id="setup-screen" class="screen">
+      <header class="app-header">
+        <h1>AI Interviewer</h1>
+        <p>Practice a realistic voice interview with an AI interviewer.</p>
+      </header>
+
+      <div id="server-status" class="status-banner">
+        <span class="status-dot"></span>
+        <span class="status-text">Checking connection...</span>
+      </div>
+
+      <form id="setup-form" class="card">
+        <div class="field">
+          <label for="position">Position</label>
+          <select id="position" name="position">
+            <option value="IT Intern">IT Intern</option>
+            <option value="IT Generalist Intern" selected>IT Generalist Intern</option>
+            <option value="Network Technician">Network Technician</option>
+            <option value="Web Developer">Web Developer</option>
+            <option value="Software Developer">Software Developer</option>
+            <option value="Cybersecurity Intern">Cybersecurity Intern</option>
+            <option value="Custom Position">Custom Position</option>
+          </select>
+        </div>
+
+        <div class="field hidden" id="custom-position-field">
+          <label for="custom-position">Enter your position</label>
+          <input type="text" id="custom-position" name="customPosition" placeholder="e.g. DevOps Intern" maxlength="100" />
+        </div>
+
+        <div class="field">
+          <label for="interview-type">Interview Type</label>
+          <select id="interview-type" name="interviewType">
+            <option value="behavioral">Behavioral</option>
+            <option value="technical">Technical</option>
+            <option value="mixed" selected>Mixed</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="difficulty">Difficulty</label>
+            <select id="difficulty" name="difficulty">
+              <option value="beginner">Beginner</option>
+              <option value="intermediate" selected>Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="question-count">Number of Questions</label>
+            <select id="question-count" name="questionCount">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="15">15</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field hidden" id="custom-count-field">
+          <label for="custom-count">How many questions?</label>
+          <input type="number" id="custom-count" name="customCount" min="1" max="30" value="10" />
+        </div>
+
+        <button type="submit" class="btn primary" id="start-btn">START INTERVIEW</button>
+        <button type="button" class="btn ghost" id="text-btn">I don't have a microphone — use text</button>
+      </form>
+    </section>
+
+    <section id="interview-screen" class="screen hidden">
+      <div id="interview-status" class="status-banner"></div>
+
+      <div class="card avatar-card">
+        <div class="avatar" aria-hidden="true">AI</div>
+        <div id="ai-message" class="ai-message">...</div>
+        <div id="candidate-message" class="candidate-message">
+          <span class="cand-name">You</span>
+          <span id="candidate-message-text" class="cand-text"></span>
+        </div>
+        <div id="progress" class="progress">Question 0 of 0</div>
+        <div id="timer" class="timer">00:00</div>
+        <button type="button" class="btn ghost" id="restart-btn">↻ Restart Interview</button>
+      </div>
+
+      <div class="card voice-card hidden" id="voice-card">
+        <div class="voice-buttons">
+          <button type="button" class="btn talk" id="talk-btn" disabled>🎤 Talk</button>
+          <button type="button" class="btn toggle" id="voice-btn">Stop Voice</button>
+        </div>
+        <div class="voice-indicators" id="voice-indicators">
+          <span class="chip" id="chip-ai"><span class="dot"></span>AI speaking</span>
+          <span class="chip" id="chip-cand"><span class="dot"></span>You speaking</span>
+          <span class="chip" id="chip-conn"><span class="dot"></span>Voice</span>
+        </div>
+        <div id="voice-hint" class="voice-hint">Listening for your answer...</div>
+        <div id="countdown" class="countdown hidden">3</div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Live Transcript</h2>
+        <div id="transcript" class="transcript"></div>
+
+        <div class="answer-area">
+          <label for="answer-input">Your answer</label>
+          <textarea id="answer-input" rows="3" maxlength="10000"
+            placeholder="You can answer by typing for now (voice arrives later)."></textarea>
+          <button type="button" class="btn primary" id="send-btn">Send Answer</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="complete-screen" class="screen hidden">
+      <div class="card avatar-card">
+        <div class="avatar green" aria-hidden="true">✓</div>
+        <div id="closing-message" class="ai-message">Interview complete.</div>
+        <div class="timer">Thank you for your time.</div>
+      </div>
+      <div class="card hidden" id="rating-card">
+        <h2 class="card-title">Candidate Rating</h2>
+        <div class="rating-overall">
+          <span class="rating-score" id="rating-overall">—</span>
+          <span class="rating-out-of">/ 10</span>
+        </div>
+        <div id="rating-dims" class="rating-dims"></div>
+        <p id="rating-note" class="rating-note"></p>
+      </div>
+      <button type="button" class="btn toggle" id="toggle-rating-btn">Show Ratings & Suggestions</button>
+      <div class="card">
+        <h2 class="card-title">Full Transcript</h2>
+        <div id="complete-transcript" class="transcript"></div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn ghost" id="return-setup-btn">← Back to Customization</button>
+        <button type="button" class="btn primary" id="new-interview-btn">Start a New Interview</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/audio.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
