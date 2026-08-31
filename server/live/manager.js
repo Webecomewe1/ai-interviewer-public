@@ -192,7 +192,7 @@ function attachVoice(ws, interviewId) {
         questionNumber: Math.min(modelTurns, session.config.questionCount),
       });
 
-      if (session.config.questionCount < 1) {
+      if (session.config.questionCount < 1 || modelTurns > session.config.questionCount) {
         complete();
       } else if (modelTurns > session.config.questionCount) {
         // Turns 1..N are the interview questions. Turn N+1 is the "would you
