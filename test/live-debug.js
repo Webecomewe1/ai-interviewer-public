@@ -1,5 +1,5 @@
 const { GoogleGenAI, Modality } = require('@google/genai');
-const config = require('../server/config');
+const config = require('../backend/config');
 
 (async () => {
   const ai = new GoogleGenAI({ apiKey: config.gemini.apiKey });

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Interviewer Hotsilog</title>
+  <meta name="description" content="Practice a realistic AI voice interview with instant feedback." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#07090d" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f7fb" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar glass">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">AI</span>
+        <div class="brand-text">
+          <span class="brand-name">AI Interviewer Hotsilog</span>
+          <span class="brand-sub">Voice practice, instant feedback</span>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div id="top-connection" class="top-state ok">
+          <span class="status-dot"></span>
+          <span id="top-connection-text">Connecting&hellip;</span>
+        </div>
+        <a href="login.html" id="auth-open-btn" class="btn ghost sm">Sign in</a>
+        <span id="auth-user-chip" class="auth-chip hidden"><span class="auth-avatar" id="auth-user-avatar">AI</span><span id="auth-user-name">Signed in</span></span>
+        <button type="button" id="logout-btn" class="btn ghost sm hidden">Sign out</button>
+        <button type="button" id="theme-toggle" class="icon-btn" title="Toggle light / dark theme" aria-label="Toggle theme">
+          <svg id="theme-sun" class="theme-ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg id="theme-moon" class="theme-ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
+        <button type="button" id="top-new-btn" class="btn ghost sm">New Session</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="app">
+    <section id="setup-screen" class="screen setup-screen">
+      <div class="setup-grid">
+        <div class="setup-hero">
+          <h1 class="hero-title">Walk in <span class="hero-accent">ready.</span></h1>
+          <p class="hero-sub">
+            A realistic AI interviewer that asks, listens, rates, and tells you
+            exactly what to improve — in text or live voice.
+          </p>
+          <ul class="hero-feats">
+            <li><span class="feat-mark" aria-hidden="true"></span> Pick a role, type, and difficulty</li>
+            <li><span class="feat-mark" aria-hidden="true"></span> Get interviewed with adaptive follow-ups</li>
+            <li><span class="feat-mark" aria-hidden="true"></span> Review ratings, impulse stats &amp; tips</li>
+          </ul>
+
+          <div id="history-card" class="history-card hidden">
+            <div class="history-head">
+              <h2 class="card-title">Recent sessions</h2>
+              <button type="button" id="clear-history-btn" class="link-btn">Clear</button>
+            </div>
+            <ul id="history-list" class="history-list"></ul>
+          </div>
+
+          <div class="tip-card">
+            <span class="tip-ic" aria-hidden="true">&#8658;</span>
+            <p>Tip: paste a resume snippet or job posting to get questions tailored to the role.</p>
+          </div>
+          
+          <div class="panel-card" style="margin-top: 20px;">
+            <div style="margin-bottom: 10px;">
+              <img src="images/Me.webp" alt="Vibe Coder" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">
+            </div>
+            <blockquote class="panel-note">"This website was vibecoded not just to practice interviews, but to challenge myself to become better with every answer. It’s a small step toward building confidence, improving my skills, and becoming the best version of myself—one interview at a time."</blockquote>
+            <p style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted);">
+              Vibe Coder: <a href="https://github.com/Webecomewe1" target="_blank">Webecomewe1</a><br>
+              Contact: <a href="mailto:anjaojr.michaelricarte@gmail.com">anjaojr.michaelricarte@gmail.com</a>
+            </p>
+          </div>
+        </div>
+
+        <form id="setup-form" class="card setup-card" autocomplete="off">
+          <h2 class="card-title">New interview</h2>
+
+          <div class="picker-block">
+            <span class="picker-label">Mode</span>
+            <div class="mode-picker" role="radiogroup" aria-label="Interview mode">
+              <button type="button" class="mode-card active" id="mode-voice" role="radio" aria-checked="true" data-mode="voice">
+                <span class="mode-ic" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+                </span>
+                <span class="mode-name">Voice interview</span>
+                <span class="mode-desc">Talk with the AI interviewer</span>
+              </button>
+              <button type="button" class="mode-card" id="mode-text" role="radio" aria-checked="false" data-mode="text">
+                <span class="mode-ic" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h8"/></svg>
+                </span>
+                <span class="mode-name">Text interview</span>
+                <span class="mode-desc">Type your answers</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="picker-block">
+            <span class="picker-label">Position</span>
+            <div class="chip-row picker-chips" id="position-chips">
+              <button type="button" class="chip-option" data-value="IT Intern">IT Intern</button>
+              <button type="button" class="chip-option active" data-value="IT Generalist Intern">IT Generalist</button>
+              <button type="button" class="chip-option" data-value="Network Technician">Network Tech</button>
+              <button type="button" class="chip-option" data-value="Web Developer">Web Dev</button>
+              <button type="button" class="chip-option" data-value="Software Developer">Software Dev</button>
+              <button type="button" class="chip-option" data-value="Cybersecurity Intern">Security</button>
+              <button type="button" class="chip-option" data-value="Custom Position">Custom&hellip;</button>
+            </div>
+          </div>
+
+          <div class="field hidden" id="custom-position-field">
+            <label for="custom-position">Enter your position</label>
+            <input type="text" id="custom-position" name="customPosition" placeholder="e.g. DevOps Intern" maxlength="100" />
+          </div>
+
+          <div class="grid-2">
+            <div class="picker-block">
+              <span class="picker-label">Interview type</span>
+              <div class="seg" id="type-chips">
+                <button type="button" class="seg-option" data-value="behavioral">Behavioral</button>
+                <button type="button" class="seg-option active" data-value="mixed">Mixed</button>
+                <button type="button" class="seg-option" data-value="technical">Technical</button>
+              </div>
+            </div>
+            <div class="picker-block">
+              <span class="picker-label">Difficulty</span>
+              <div class="seg" id="difficulty-chips">
+                <button type="button" class="seg-option" data-value="beginner">Beginner</button>
+                <button type="button" class="seg-option active" data-value="intermediate">Intermediate</button>
+                <button type="button" class="seg-option" data-value="advanced">Advanced</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="picker-block">
+            <span class="picker-label">Number of questions</span>
+            <div class="seg" id="count-chips">
+              <button type="button" class="seg-option" data-value="5">5</button>
+              <button type="button" class="seg-option active" data-value="10">10</button>
+              <button type="button" class="seg-option" data-value="15">15</button>
+              <button type="button" class="seg-option" data-value="custom">Custom&hellip;</button>
+            </div>
+          </div>
+
+          <div class="field hidden" id="custom-count-field">
+            <label for="custom-count">How many questions?</label>
+            <input type="number" id="custom-count" name="customCount" min="1" max="30" value="10" />
+          </div>
+
+          <div class="visually-hidden" aria-hidden="true">
+            <select id="position" name="position" tabindex="-1">
+              <option value="IT Intern">IT Intern</option>
+              <option value="IT Generalist Intern" selected>IT Generalist Intern</option>
+              <option value="Network Technician">Network Technician</option>
+              <option value="Web Developer">Web Developer</option>
+              <option value="Software Developer">Software Developer</option>
+              <option value="Cybersecurity Intern">Cybersecurity Intern</option>
+              <option value="Custom Position">Custom Position</option>
+            </select>
+            <select id="interview-type" name="interviewType" tabindex="-1">
+              <option value="behavioral">Behavioral</option>
+              <option value="technical">Technical</option>
+              <option value="mixed" selected>Mixed</option>
+            </select>
+            <select id="difficulty" name="difficulty" tabindex="-1">
+              <option value="beginner">Beginner</option>
+              <option value="intermediate" selected>Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select>
+            <select id="question-count" name="questionCount" tabindex="-1">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="15">15</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+
+          <div class="context-block">
+            <h3 class="block-label">Context <span class="block-hint">optional — makes questions smarter</span></h3>
+            <div class="field">
+              <label for="resume">Resume / experience</label>
+              <textarea id="resume" name="resume" rows="3" maxlength="20000"
+                placeholder="Paste a summary of your experience, skills, projects&hellip;"></textarea>
+            </div>
+            <div class="field">
+              <label for="job-description">Job description</label>
+              <textarea id="job-description" name="jobDescription" rows="3" maxlength="20000"
+                placeholder="Paste the job posting you are preparing for&hellip;"></textarea>
+            </div>
+            <div class="field">
+              <label for="company-info">Company info</label>
+              <textarea id="company-info" name="companyInfo" rows="2" maxlength="20000"
+                placeholder="Anything about the company / team / culture&hellip;"></textarea>
+            </div>
+          </div>
+
+          <div class="setup-actions">
+            <button type="submit" class="btn primary block" id="start-btn">Start interview</button>
+            <button type="button" class="link-cool" id="text-btn">Or practice by typing instead</button>
+            <span class="autosave-hint" id="autosave-hint">Draft saved locally</span>
+          </div>
+          <div id="server-status" class="status-banner">
+            <span class="status-dot"></span>
+            <span class="status-text">Checking connection&hellip;</span>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/auth.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/setup.js"></script>
+</body>
+</html>

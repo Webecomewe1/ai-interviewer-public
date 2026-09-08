@@ -2,19 +2,19 @@
   "name": "ai-interviewer",
   "version": "1.0.0",
   "description": "Web-based AI voice interviewer powered by Gemini",
-  "main": "server/index.js",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
-  },
-  "engines": {
-    "node": ">=18"
+    "dev": "concurrently -k -n backend,frontend -c blue,green \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "start": "npm start --prefix backend",
+    "build": "npm run build --prefix frontend",
+    "seed": "node scripts/seed-questions.js"
   },
   "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  },
   "dependencies": {
-    "@google/genai": "^2.19.0",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
     "ws": "^8.21.3"
   }
 }
