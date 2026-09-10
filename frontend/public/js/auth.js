@@ -35,7 +35,8 @@
     },
 
     authRequest: function (path, body) {
-      return fetch(path, {
+      var baseUrl = typeof __API_BASE__ !== 'undefined' && __API_BASE__ ? __API_BASE__ : '';
+      return fetch(baseUrl + path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body || {}),
@@ -79,6 +80,18 @@
 
     resendOtp: function (email) {
       return window.Auth.authRequest('/api/auth/resend-otp', { email: email });
+    },
+
+    forgotPassword: function (email) {
+      return window.Auth.authRequest('/api/auth/forgot-password', { email: email });
+    },
+
+    verifyResetOtp: function (email, code) {
+      return window.Auth.authRequest('/api/auth/verify-reset-otp', { email: email, code: code });
+    },
+
+    resetPassword: function (email, password) {
+      return window.Auth.authRequest('/api/auth/reset-password', { email: email, password: password });
     },
   };
 })();

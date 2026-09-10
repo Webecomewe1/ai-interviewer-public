@@ -21,8 +21,12 @@
   function showForm(formId) {
     var registerForm = document.getElementById('register-form');
     var verifyForm = document.getElementById('verify-form');
+    var forgotForm = document.getElementById('forgot-form');
+    var resetForm = document.getElementById('reset-form');
     if (registerForm) registerForm.classList.add('hidden');
     if (verifyForm) verifyForm.classList.add('hidden');
+    if (forgotForm) forgotForm.classList.add('hidden');
+    if (resetForm) resetForm.classList.add('hidden');
     var target = document.getElementById(formId);
     if (target) target.classList.remove('hidden');
   }
@@ -198,4 +202,135 @@
       return data;
     });
   };
+
+  // ===== Forgot password / reset flow =====
+  var forgotForm = document.getElementById('forgot-form');
+  var resetForm = document.getElementById('reset-form');
+  var resetEmail = null;
+
+  function openForgotForm() {
+    showForm('forgot-form');
+    var forgotEmailInput = document.getElementById('forgot-email');
+    if (forgotEmailInput) forgotEmailInput.focus();
+  }
+
+  var forgotLink = document.getElementById('forgot-link');
+  if (forgotLink) {
+    forgotLink.addEventListener('click', function (e) {
+      e.preventDefault();
+      openForgotForm();
+    });
+  }
+
+  // Deep link: login.html links here with ?forgot=1
+  try {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('forgot') === '1' && forgotForm) {
+      openForgotForm();
+    }
+  } catch (err) {}
+
+  if (forgotForm) {
+    var forgotBtn = document.getElementById('forgot-btn');
+    var forgotBackBtn = document.getElementById('forgot-back-btn');
+
+    if (forgotBackBtn) {
+      forgotBackBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        showForm('register-form');
+      });
+    }
+
+    forgotForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (forgotBtn.disabled) return;
+      var emailInput = document.getElementById('forgot-email');
+      var email = emailInput ? emailInput.value.trim() : '';
+      if (!email) {
+        showToast('Please enter your email address.');
+        return;
+      }
+      setBusy(forgotBtn, true);
+      window.Auth.forgotPassword(email)
+        .then(function () {
+          setBusy(forgotBtn, false);
+          resetEmail = email;
+          showForm('reset-form');
+          var resetCodeInput = document.getElementById('reset-code');
+          if (resetCodeInput) resetCodeInput.value = '';
+          var resetPasswordInput = document.getElementById('reset-password');
+          if (resetPasswordInput) resetPasswordInput.value = '';
+          showToast('If an account exists for that email, a reset code has been sent to ' + email + '.');
+        })
+        .catch(function (err) {
+          setBusy(forgotBtn, false);
+          showToast((err && err.message) || 'Could not send reset code.');
+        });
+    });
+  }
+
+  if (resetForm) {
+    var resetBtn = document.getElementById('reset-btn');
+    var resetResendBtn = document.getElementById('reset-resend-btn');
+
+    resetForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (resetBtn.disabled) return;
+      if (!resetEmail) {
+        showToast('Please request a reset code first.');
+        return;
+      }
+      var codeInput = document.getElementById('reset-code');
+      var passwordInput = document.getElementById('reset-password');
+      var code = codeInput ? codeInput.value.trim() : '';
+      var password = passwordInput ? passwordInput.value : '';
+      if (!code || code.length !== 6) {
+        showToast('Please enter the 6-digit reset code.');
+        return;
+      }
+      if (password.length < 8) {
+        showToast('Password must be at least 8 characters.');
+        return;
+      }
+
+      setBusy(resetBtn, true);
+      window.Auth.verifyResetOtp(resetEmail, code)
+        .then(function () {
+          return window.Auth.resetPassword(resetEmail, password);
+        })
+        .then(function () {
+          setBusy(resetBtn, false);
+          UI.flash('Password updated. Please sign in with your new password.');
+          location.href = 'login.html';
+        })
+        .catch(function (err) {
+          setBusy(resetBtn, false);
+          showToast((err && err.message) || 'Could not reset password.');
+        });
+    });
+
+    if (resetResendBtn) {
+      resetResendBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (resetResendBtn.disabled) return;
+        if (!resetEmail) {
+          showToast('No email to resend to. Please start over.');
+          return;
+        }
+        resetResendBtn.disabled = true;
+        resetResendBtn.textContent = 'Sending...';
+        window.Auth.forgotPassword(resetEmail)
+          .then(function () {
+            resetResendBtn.textContent = 'Resend code';
+            startResendCountdown(resetResendBtn);
+            showToast('New reset code sent to ' + resetEmail + '.');
+          })
+          .catch(function (err) {
+            resetResendBtn.textContent = 'Resend code';
+            resetResendBtn.disabled = false;
+            showToast((err && err.message) || 'Could not resend code.');
+          });
+      });
+    }
+  }
 })();

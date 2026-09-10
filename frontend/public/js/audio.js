@@ -66,7 +66,7 @@
       return Promise.reject(new Error('AudioWorklet is not supported in this browser.'));
     }
     return self.audioCtx.audioWorklet
-      .addModule('worklets/pcm.js')
+      .addModule(new URL('./pcm.js', import.meta.url).href)
       .then(function () {
         self.source = self.audioCtx.createMediaStreamSource(self.stream);
         self.workletNode = new AudioWorkletNode(self.audioCtx, 'pcm-processor', {
@@ -77,6 +77,10 @@
           self._onPcm(e.data);
         };
         self.source.connect(self.workletNode);
+      })
+      .catch(function (err) {
+        console.error('Failed to load worklet module js/pcm.js:', err);
+        throw err;
       });
   };
 
@@ -120,8 +124,14 @@
 
   VoiceSession.prototype._openSocket = function (interviewId) {
     var self = this;
-    var proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    var url = proto + '://' + location.host + '/live/' + interviewId;
+    var baseUrl = typeof __API_BASE__ !== 'undefined' && __API_BASE__ ? __API_BASE__ : '';
+    var url;
+    if (baseUrl) {
+      url = baseUrl.replace(/^http/, 'ws') + '/live/' + interviewId;
+    } else {
+      var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      url = proto + '://' + location.host + '/live/' + interviewId;
+    }
     var token = window.Auth ? window.Auth.getToken() : null;
     if (token) url += '?token=' + encodeURIComponent(token);
     var ws = new WebSocket(url);

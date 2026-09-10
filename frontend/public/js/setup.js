@@ -27,6 +27,8 @@
     modeVoice: document.getElementById('mode-voice'),
     modeText: document.getElementById('mode-text'),
     autosaveHint: document.getElementById('autosave-hint'),
+    advancedToggle: document.getElementById('advanced-toggle'),
+    advancedOptions: document.getElementById('advanced-options'),
   };
 
   var selectedMode = 'voice';
@@ -49,6 +51,27 @@
   function initModePicker() {
     if (els.modeVoice) els.modeVoice.addEventListener('click', function () { setSelectedMode('voice'); });
     if (els.modeText) els.modeText.addEventListener('click', function () { setSelectedMode('text'); });
+  }
+
+  // --------------------------------------------------------- advanced toggle
+
+  function initAdvancedToggle() {
+    if (!els.advancedToggle || !els.advancedOptions) return;
+    
+    els.advancedToggle.addEventListener('click', function () {
+      var isExpanded = els.advancedToggle.getAttribute('aria-expanded') === 'true';
+      var newState = !isExpanded;
+      
+      els.advancedToggle.setAttribute('aria-expanded', newState ? 'true' : 'false');
+      
+      if (newState) {
+        els.advancedOptions.classList.remove('collapsed', 'collapsing');
+        els.advancedOptions.classList.add('expanded');
+      } else {
+        els.advancedOptions.classList.add('collapsed');
+        els.advancedOptions.classList.remove('expanded');
+      }
+    });
   }
 
   function initPicker(groupId, selectEl) {
@@ -398,6 +421,7 @@
   initPicker('difficulty-chips', els.difficulty);
   initPicker('count-chips', els.questionCount);
   initModePicker();
+  initAdvancedToggle();
   wireContextAutosave();
   checkServerStatus();
   renderHistory();

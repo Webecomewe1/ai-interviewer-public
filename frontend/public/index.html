@@ -124,39 +124,49 @@
             <input type="text" id="custom-position" name="customPosition" placeholder="e.g. DevOps Intern" maxlength="100" />
           </div>
 
-          <div class="grid-2">
-            <div class="picker-block">
-              <span class="picker-label">Interview type</span>
-              <div class="seg" id="type-chips">
-                <button type="button" class="seg-option" data-value="behavioral">Behavioral</button>
-                <button type="button" class="seg-option active" data-value="mixed">Mixed</button>
-                <button type="button" class="seg-option" data-value="technical">Technical</button>
-              </div>
-            </div>
-            <div class="picker-block">
-              <span class="picker-label">Difficulty</span>
-              <div class="seg" id="difficulty-chips">
-                <button type="button" class="seg-option" data-value="beginner">Beginner</button>
-                <button type="button" class="seg-option active" data-value="intermediate">Intermediate</button>
-                <button type="button" class="seg-option" data-value="advanced">Advanced</button>
-              </div>
-            </div>
-          </div>
+           <div class="grid-2">
+             <div class="picker-block">
+               <span class="picker-label">Interview type</span>
+               <div class="seg" id="type-chips">
+                 <button type="button" class="seg-option" data-value="behavioral">Behavioral</button>
+                 <button type="button" class="seg-option active" data-value="mixed">Mixed</button>
+                 <button type="button" class="seg-option" data-value="technical">Technical</button>
+               </div>
+             </div>
+             <div class="picker-block">
+               <span class="picker-label">Difficulty</span>
+               <div class="seg" id="difficulty-chips">
+                 <button type="button" class="seg-option" data-value="beginner">Beginner</button>
+                 <button type="button" class="seg-option active" data-value="intermediate">Intermediate</button>
+                 <button type="button" class="seg-option" data-value="advanced">Advanced</button>
+               </div>
+             </div>
+           </div>
 
-          <div class="picker-block">
-            <span class="picker-label">Number of questions</span>
-            <div class="seg" id="count-chips">
-              <button type="button" class="seg-option" data-value="5">5</button>
-              <button type="button" class="seg-option active" data-value="10">10</button>
-              <button type="button" class="seg-option" data-value="15">15</button>
-              <button type="button" class="seg-option" data-value="custom">Custom&hellip;</button>
-            </div>
-          </div>
+           <div class="advanced-toggle">
+             <button type="button" class="advanced-toggle-btn" id="advanced-toggle" aria-expanded="false" aria-controls="advanced-options">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                 <polyline points="6 9 12 15 18 9"></polyline>
+               </svg>
+               <span>Advanced options</span>
+             </button>
+           </div>
 
-          <div class="field hidden" id="custom-count-field">
-            <label for="custom-count">How many questions?</label>
-            <input type="number" id="custom-count" name="customCount" min="1" max="30" value="10" />
-          </div>
+           <div id="advanced-options" class="advanced-options collapsed">
+             <div class="picker-block">
+               <span class="picker-label">Number of questions</span>
+               <div class="seg" id="count-chips">
+                 <button type="button" class="seg-option" data-value="5">5</button>
+                 <button type="button" class="seg-option active" data-value="10">10</button>
+                 <button type="button" class="seg-option" data-value="15">15</button>
+                 <button type="button" class="seg-option" data-value="custom">Custom&hellip;</button>
+               </div>
+             </div>
+
+             <div class="field hidden" id="custom-count-field">
+               <label for="custom-count">How many questions?</label>
+               <input type="number" id="custom-count" name="customCount" min="1" max="30" value="10" />
+             </div>
 
           <div class="visually-hidden" aria-hidden="true">
             <select id="position" name="position" tabindex="-1">
@@ -219,8 +229,8 @@
     </section>
   </main>
 
-  <script src="js/auth.js"></script>
-  <script src="js/common.js"></script>
-  <script src="js/setup.js"></script>
+  <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/common.js"></script>
+  <script type="module" src="js/setup.js"></script>
 </body>
 </html>

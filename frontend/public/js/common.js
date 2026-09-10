@@ -87,7 +87,8 @@
     if (token) {
       opts.headers = Object.assign({}, opts.headers || {}, { Authorization: 'Bearer ' + token });
     }
-    return fetch(path, opts).then(function (res) {
+    var baseUrl = typeof __API_BASE__ !== 'undefined' && __API_BASE__ ? __API_BASE__ : '';
+    return fetch(baseUrl + path, opts).then(function (res) {
       if (res.status === 401 && token) {
         try { window.Auth.logout(); } catch (e) {}
       }

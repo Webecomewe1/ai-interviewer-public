@@ -54,6 +54,38 @@
           <button type="button" class="link-btn" id="resend-btn">Resend code</button>
         </div>
       </form>
+      <form id="forgot-form" class="auth-card hidden" autocomplete="on">
+        <div class="auth-head">
+          <h1 class="auth-title">Reset your password</h1>
+          <p class="panel-note">Enter your email and we'll send you a 6-digit reset code.</p>
+        </div>
+        <div class="field">
+          <label for="forgot-email">Email</label>
+          <input type="email" id="forgot-email" name="email" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+        <div class="auth-actions">
+          <button type="submit" class="btn primary block" id="forgot-btn" data-label="Send reset code">Send reset code</button>
+          <button type="button" class="link-btn" id="forgot-back-btn">Back to sign up</button>
+        </div>
+      </form>
+      <form id="reset-form" class="auth-card hidden" autocomplete="off">
+        <div class="auth-head">
+          <h1 class="auth-title">Set a new password</h1>
+          <p class="panel-note">Enter the 6-digit code sent to your email, then choose a new password.</p>
+        </div>
+        <div class="field">
+          <label for="reset-code">Reset code</label>
+          <input type="text" id="reset-code" name="code" placeholder="000000" maxlength="6" required />
+        </div>
+        <div class="field">
+          <label for="reset-password">New password</label>
+          <input type="password" id="reset-password" name="password" minlength="8" placeholder="At least 8 characters" autocomplete="new-password" required />
+        </div>
+        <div class="auth-actions">
+          <button type="submit" class="btn primary block" id="reset-btn" data-label="Update password">Update password</button>
+          <button type="button" class="link-btn" id="reset-resend-btn">Resend code</button>
+        </div>
+      </form>
       <form id="register-form" class="auth-card" autocomplete="on">
         <div class="field">
           <label for="register-name">Name <span class="block-hint">optional</span></label>
@@ -73,13 +105,14 @@
       </form>
       <div class="auth-links">
         <a href="login.html" class="link-btn">Already have an account? Sign in</a>
+        <button type="button" class="link-btn" id="forgot-link">Forgot password?</button>
         <a href="index.html" class="link-btn">Back to home</a>
       </div>
     </div>
   </main>
 
-  <script src="js/auth.js"></script>
-  <script src="js/common.js"></script>
-  <script src="js/authform.js"></script>
+  <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/common.js"></script>
+  <script type="module" src="js/authform.js"></script>
 </body>
 </html>

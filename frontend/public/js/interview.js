@@ -103,7 +103,54 @@
   function addBubble(container, role, text) {
     var div = document.createElement('div');
     div.className = 'bubble ' + role;
-    div.textContent = text;
+    
+    // Create bubble content wrapper
+    var contentWrapper = document.createElement('div');
+    contentWrapper.className = 'bubble-content';
+    
+    var textSpan = document.createElement('span');
+    textSpan.className = 'bubble-text';
+    textSpan.textContent = text;
+    contentWrapper.appendChild(textSpan);
+    
+    // Add timestamp
+    var timestamp = document.createElement('span');
+    timestamp.className = 'bubble-timestamp';
+    var now = new Date();
+    var hours = String(now.getHours()).padStart(2, '0');
+    var mins = String(now.getMinutes()).padStart(2, '0');
+    timestamp.textContent = hours + ':' + mins;
+    contentWrapper.appendChild(timestamp);
+    
+    div.appendChild(contentWrapper);
+    
+    // Add copy button for candidate responses
+    if (role === 'candidate') {
+      var actions = document.createElement('div');
+      actions.className = 'bubble-actions';
+      var copyBtn = document.createElement('button');
+      copyBtn.className = 'bubble-action-btn';
+      copyBtn.setAttribute('type', 'button');
+      copyBtn.setAttribute('aria-label', 'Copy response');
+      copyBtn.setAttribute('title', 'Copy to clipboard');
+      copyBtn.innerHTML = '📋';
+      copyBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        navigator.clipboard.writeText(text).then(function() {
+          copyBtn.innerHTML = '✓';
+          copyBtn.style.color = 'var(--success)';
+          setTimeout(function() {
+            copyBtn.innerHTML = '📋';
+            copyBtn.style.color = '';
+          }, 2000);
+        }).catch(function() {
+          console.error('Failed to copy');
+        });
+      });
+      actions.appendChild(copyBtn);
+      div.appendChild(actions);
+    }
+    
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
     return div;
@@ -155,7 +202,13 @@
   }
 
   function setVoicePanelSpeaking(speaking) {
-    if (els.voiceCard) els.voiceCard.classList.toggle('speaking', speaking);
+    if (els.voiceCard) {
+      els.voiceCard.classList.toggle('speaking', speaking);
+      var avatar = els.voiceCard.querySelector('.avatar');
+      if (avatar) {
+        avatar.classList.toggle('breathing', speaking);
+      }
+    }
   }
 
   function setTalkButton(state, label) {
