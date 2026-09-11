@@ -8,6 +8,9 @@ const userSchema = new mongoose.Schema(
     emailVerified: { type: Boolean, default: false },
     verificationCode: { type: String, default: null },
     verificationExpires: { type: Date, default: null },
+    resetCode: { type: String, default: null },
+    resetExpires: { type: Date, default: null },
+    resetVerified: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

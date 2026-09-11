@@ -27,6 +27,7 @@ router.post('/start', interviewLimiter, async (req, res) => {
     const session = await createSession(config, {
       userId: req.user ? req.user.id : null,
     });
+    console.log(`[INTERVIEW] Started new session: ${session.id} (Mode: ${config.mode}, Position: ${config.position})`);
     let result = {};
     if (config.mode === 'voice') {
       result = {
@@ -145,6 +146,7 @@ router.post('/:id/finalize', async (req, res) => {
     if (session.status === 'completed') {
       return res.status(409).json({ error: 'This interview is already finished.' });
     }
+    console.log(`[ASSESSMENT] Generating assessment and finalizing session: ${session.id}`);
     await session.evaluate();
     session.status = 'completed';
     session.completedAt = Date.now();

@@ -1,4 +1,14 @@
 const express = require('express');
+
+// Crash protection & logging
+process.on('uncaughtException', (err) => {
+  console.error('FATAL EXCEPTION:', err.stack || err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION:', reason.stack || reason);
+});
+
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -12,6 +22,7 @@ const { initLiveServer } = require('./live/manager');
 const store = require('./interview/store');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = config.port;
 
 // Global Security Hardening: Helmet protection against clickjacking, XSS, and general exploits
@@ -102,14 +113,17 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Internal server error' });
+  console.error('Server error:', err);
+  res.status(500).json({ 
+    error: err.message || 'Internal server error', 
+    stack: process.env.NODE_ENV === 'production' ? undefined : err.stack 
+  });
 });
 
 connectDB()
   .then(() => {
     const server = app.listen(PORT, () => {
-      console.log(`AI Interviewer running at http://localhost:${PORT}`);
+      console.log(`AI Interviewer running at ${config.backendUrl || `http://localhost:${PORT}`}`);
       if (!gemini.isConfigured()) {
         console.warn('Warning: GEMINI_API_KEY is not set. Add it to the .env file.');
       }
@@ -120,6 +134,6 @@ connectDB()
     initLiveServer(server);
   })
   .catch((err) => {
-    console.error('Failed to start server:', err && err.message);
+    console.error('FATAL: Failed to start server:', err.stack || err.message);
     process.exit(1);
   });
