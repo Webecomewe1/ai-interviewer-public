@@ -4,16 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Interviewer Hotsilog</title>
-  <meta name="description" content="Practice a realistic AI voice interview with instant feedback." />
+  <meta name="description" content="Prepare for your next interview with role-specific voice and text practice, actionable AI feedback, and a guided STAR warm-up." />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#07090d" />
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f7fb" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script>(function(){var t;try{t=localStorage.getItem('ai-interviewer:theme')}catch(e){}if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',t)})();</script>
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/practice.css" />
 </head>
-<body>
+<body class="practice-page">
   <a class="skip-link" href="#main">Skip to content</a>
 
   <header class="topbar glass">
@@ -25,6 +24,12 @@
           <span class="brand-sub">Voice practice, instant feedback</span>
         </div>
       </div>
+
+      <nav class="practice-nav" aria-label="Main navigation">
+        <a href="#setup-form">Practice</a>
+        <a href="#warmup">Warm up</a>
+        <a href="#research">Why it works</a>
+      </nav>
 
       <div class="topbar-actions">
         <div id="top-connection" class="top-state ok">
@@ -44,47 +49,29 @@
   </header>
 
   <main id="main" class="app">
-    <section id="setup-screen" class="screen setup-screen">
-      <div class="setup-grid">
-        <div class="setup-hero">
-          <h1 class="hero-title">Walk in <span class="hero-accent">ready.</span></h1>
-          <p class="hero-sub">
-            A realistic AI interviewer that asks, listens, rates, and tells you
-            exactly what to improve — in text or live voice.
-          </p>
-          <ul class="hero-feats">
-            <li><span class="feat-mark" aria-hidden="true"></span> Pick a role, type, and difficulty</li>
-            <li><span class="feat-mark" aria-hidden="true"></span> Get interviewed with adaptive follow-ups</li>
-            <li><span class="feat-mark" aria-hidden="true"></span> Review ratings, impulse stats &amp; tips</li>
-          </ul>
-
-          <div id="history-card" class="history-card hidden">
-            <div class="history-head">
-              <h2 class="card-title">Recent sessions</h2>
-              <button type="button" id="clear-history-btn" class="link-btn">Clear</button>
-            </div>
-            <ul id="history-list" class="history-list"></ul>
-          </div>
-
-          <div class="tip-card">
-            <span class="tip-ic" aria-hidden="true">&#8658;</span>
-            <p>Tip: paste a resume snippet or job posting to get questions tailored to the role.</p>
-          </div>
-          
-          <div class="panel-card" style="margin-top: 20px;">
-            <div style="margin-bottom: 10px;">
-              <img src="images/Me.webp" alt="Vibe Coder" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;">
-            </div>
-            <blockquote class="panel-note">"This website was vibecoded not just to practice interviews, but to challenge myself to become better with every answer. It’s a small step toward building confidence, improving my skills, and becoming the best version of myself—one interview at a time."</blockquote>
-            <p style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted);">
-              Vibe Coder: <a href="https://github.com/Webecomewe1" target="_blank">Webecomewe1</a><br>
-              Contact: <a href="mailto:anjaojr.michaelricarte@gmail.com">anjaojr.michaelricarte@gmail.com</a>
-            </p>
-          </div>
+    <section id="setup-screen" class="screen setup-screen" aria-labelledby="welcome-title">
+      <div class="welcome">
+        <div>
+          <p class="eyebrow">YOUR NEXT INTERVIEW STARTS HERE</p>
+          <h1 id="welcome-title">Good answers take <span>practice.</span></h1>
+          <p>Build the confidence to explain what you know. Practice for your role, get specific feedback, and know what to work on next.</p>
         </div>
-
-        <form id="setup-form" class="card setup-card" autocomplete="off">
-          <h2 class="card-title">New interview</h2>
+        <a class="btn ghost" href="#warmup">Try a sample question <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="practice-path" aria-label="Your practice journey">
+        <span><b>Choose your focus</b> A session built around you</span>
+        <span><b>Practice your answers</b> Speak or type at your pace</span>
+        <span><b>Find your next step</b> Review feedback and try again</span>
+      </div>
+      <div class="setup-grid">
+        <form id="setup-form" class="card setup-card" autocomplete="off" novalidate>
+          <div class="section-heading"><h2 class="card-title">Your practice session</h2><span class="quiet-tag">Voice or text</span></div>
+          <p class="form-intro">Start with a focus, then make it your own.</p>
+          <div class="preset-picker" aria-label="Quick practice presets">
+            <button type="button" data-preset="starter"><b>First interview</b><span>5 questions, beginner</span></button>
+            <button type="button" data-preset="behavioral"><b>Tell your story</b><span>5 questions, behavioral</span></button>
+            <button type="button" data-preset="technical"><b>Technical practice</b><span>10 questions, technical</span></button>
+          </div>
 
           <div class="picker-block">
             <span class="picker-label">Mode</span>
@@ -148,7 +135,7 @@
                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                  <polyline points="6 9 12 15 18 9"></polyline>
                </svg>
-               <span>Advanced options</span>
+               <span>Personalize your session</span>
              </button>
            </div>
 
@@ -197,7 +184,8 @@
           </div>
 
           <div class="context-block">
-            <h3 class="block-label">Context <span class="block-hint">optional — makes questions smarter</span></h3>
+            <h3 class="block-label">Add context <span class="block-hint">optional</span></h3>
+            <p class="context-help">Add relevant skills and responsibilities to tailor the questions. Leave out contact details and confidential information.</p>
             <div class="field">
               <label for="resume">Resume / experience</label>
               <textarea id="resume" name="resume" rows="3" maxlength="20000"
@@ -214,23 +202,81 @@
                 placeholder="Anything about the company / team / culture&hellip;"></textarea>
             </div>
           </div>
+          </div>
 
           <div class="setup-actions">
-            <button type="submit" class="btn primary block" id="start-btn">Start interview</button>
+            <p id="session-preview" class="session-preview" aria-live="polite">10 questions, intermediate, mixed interview</p>
+            <button type="submit" class="btn primary block" id="start-btn" disabled>Start interview</button>
             <button type="button" class="link-cool" id="text-btn">Or practice by typing instead</button>
-            <span class="autosave-hint" id="autosave-hint">Draft saved locally</span>
+            <p class="setup-help" id="signin-hint">Sign-in is required for AI sessions and saved results.</p>
+            <div class="draft-controls"><span class="autosave-hint" id="autosave-hint" role="status">Changes are saved on this device</span><button type="button" id="forget-context" class="link-btn">Clear saved context</button></div>
+            <p class="setup-help">Session context is saved in this browser and sent to the server and Google Gemini when you start an AI interview.</p>
           </div>
           <div id="server-status" class="status-banner">
             <span class="status-dot"></span>
-            <span class="status-text">Checking connection&hellip;</span>
+            <span class="status-text" role="status">Checking connection&hellip;</span>
+            <button type="button" id="retry-connection" class="hidden">Retry</button>
           </div>
         </form>
+        <div class="setup-hero">
+          <section class="warmup-card" id="warmup" aria-labelledby="warmup-title">
+            <div class="section-heading"><p class="eyebrow">A LITTLE PRACTICE, RIGHT NOW</p><span class="quiet-tag">No sign-in needed</span></div>
+            <h2 id="warmup-title">Find the story in your experience.</h2>
+            <p id="warmup-question" class="warmup-question">Tell me about a time you solved a difficult problem with a team.</p>
+            <div class="warmup-toolbar"><span>Sample behavioral question</span><button type="button" id="next-question" class="link-btn">Another question ↻</button></div>
+            <div class="star-guide" aria-label="STAR answer structure">
+              <button type="button" aria-pressed="true" data-star="situation"><b>S</b> Situation</button>
+              <button type="button" aria-pressed="false" data-star="task"><b>T</b> Task</button>
+              <button type="button" aria-pressed="false" data-star="action"><b>A</b> Action</button>
+              <button type="button" aria-pressed="false" data-star="result"><b>R</b> Result</button>
+            </div>
+            <p id="star-tip" class="star-tip" aria-live="polite">Set the scene. What was happening, and why did it matter?</p>
+            <label for="warmup-answer">Sketch your answer</label>
+            <textarea id="warmup-answer" rows="4" maxlength="10000" placeholder="Think of a project, class, internship, or work experience..."></textarea>
+            <div class="warmup-toolbar"><span id="warmup-count" aria-live="polite">0 words</span><button type="button" id="review-warmup" class="btn ghost sm">Show review checklist</button></div>
+            <p id="warmup-feedback" class="warmup-feedback" role="status">Your warm-up stays on this page. This is guided self-practice, without AI scoring.</p>
+          </section>
+
+          <div id="history-card" class="history-card hidden">
+            <div class="history-head">
+              <h2 class="card-title">Recent sessions</h2>
+              <button type="button" id="clear-history-btn" class="link-btn">Clear</button>
+            </div>
+            <ul id="history-list" class="history-list"></ul>
+          </div>
+
+          <div class="practice-note"><b>Make your experience the evidence.</b><p>A strong answer explains the situation, your contribution, and what changed. Use real examples, even if they come from coursework or personal projects.</p></div>
+        </div>
+
+
       </div>
     </section>
+
+    <section id="research" class="research-section" aria-labelledby="research-title">
+      <p class="eyebrow">PRACTICE WHAT EMPLOYERS LOOK FOR</p>
+      <h2 id="research-title">Show your skills. Explain your impact.</h2>
+      <p class="section-intro">Recent hiring research makes a case for practicing concrete examples and clear communication.</p>
+      <div class="research-grid">
+        <article class="research-feature"><span class="research-number">Nearly 70%</span><h3>of surveyed employers use skills-based hiring.</h3><p>Prepare examples of how you used your skills to solve a problem.</p><a href="https://www.naceweb.org/research/reports/job-outlook/" target="_blank" rel="noopener noreferrer">NACE, Job Outlook 2026 Spring Update ↗</a></article>
+        <article><span class="research-number">93%</span><h3>of talent professionals prioritize accurate skills assessment.</h3><p>Go beyond naming a skill. Explain your decisions, trade-offs, and results.</p><a href="https://www.linkedin.com/business/talent/blog/talent-acquisition/future-of-recruiting-2025" target="_blank" rel="noopener noreferrer">LinkedIn, Future of Recruiting 2025 ↗</a></article>
+      </div>
+      <p class="source-note">Research context, not app success rates. NACE surveyed 185 employers in February-March 2026; its findings concern U.S. college recruiting. LinkedIn's report draws on over 1,000 talent professionals and platform data.</p>
+    </section>
+    <section class="faq-section" aria-labelledby="faq-title">
+      <div><p class="eyebrow">BEFORE YOU BEGIN</p><h2 id="faq-title">A clearer way to prepare.</h2></div>
+      <div class="faq-items">
+        <details><summary>What do I get after an interview?</summary><p>A transcript, AI feedback across six skill areas, suggestions, and a focused practice plan. Use the feedback to refine your answers; AI ratings are practice guidance and do not predict hiring outcomes.</p></details>
+        <details><summary>Do I need a microphone?</summary><p>Only for a voice session. Text interviews work without a microphone. If voice is unavailable, choose text practice. The sample warm-up works without an account or connection to the AI service.</p></details>
+        <details><summary>How is my information used?</summary><p>Your setup context is saved in this browser. Starting an AI interview sends your context and answers to the server and Google Gemini to generate questions and feedback. Signed-in sessions can be stored in your account. Use “Clear saved context” to remove the setup draft from this device; this does not delete account sessions.</p></details>
+        <details><summary>How should I use the feedback?</summary><p>Choose one area to work on, rewrite an answer using a specific example, and practice again. For behavioral questions, try Situation, Task, Action, Result. For technical questions, explain your approach and the trade-offs.</p></details>
+      </div>
+    </section>
+    <footer class="practice-footer"><span>AI Interviewer Hotsilog <span class="footer-note">Built for the practice that builds confidence.</span></span><a href="https://github.com/Webecomewe1" target="_blank" rel="noopener noreferrer">Built by Webecomewe1 ↗</a><a href="mailto:anjaojr.michaelricarte@gmail.com">Contact</a></footer>
   </main>
 
   <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/common.js"></script>
   <script type="module" src="js/setup.js"></script>
+  <script type="module" src="js/practice.js"></script>
 </body>
 </html>

@@ -49,7 +49,7 @@ function validateSignup({ name, email, password }) {
   return { email: cleanEmail, name: cleanName, password: cleanPassword };
 }
 
-router.post('/signup', async (req, res) => {
+router.post('/signup', resendLimiter, async (req, res) => {
   if (!isMongoConfigured()) {
     return res.status(503).json({ error: 'Accounts are unavailable until MongoDB is configured.' });
   }
@@ -300,7 +300,7 @@ router.post('/reset-password', verifyLimiter, async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', verifyLimiter, async (req, res) => {
   if (!isMongoConfigured()) {
     return res.status(503).json({ error: 'Accounts are unavailable until MongoDB is configured.' });
   }

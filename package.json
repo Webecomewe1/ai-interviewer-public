@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Web-based AI voice interviewer powered by Gemini",
   "scripts": {
+    "test": "node --test test/personalization.test.js test/practice-plan.test.js test/abuse-protection.test.js test/voice-abuse.test.js test/provider-limits.test.js test/quota-store.test.js",
     "dev": "concurrently -k -n backend,frontend -c blue,green \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",

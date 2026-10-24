@@ -33,6 +33,7 @@
 
   var selectedMode = 'voice';
   var appVoiceAvailable = false;
+  var serviceReady = false;
 
   // --------------------------------------------------------- mode picker
 
@@ -46,11 +47,24 @@
       els.modeText.classList.toggle('active', selectedMode === 'text');
       els.modeText.setAttribute('aria-checked', selectedMode === 'text' ? 'true' : 'false');
     }
+    if (els.modeVoice) els.modeVoice.tabIndex = selectedMode === 'voice' ? 0 : -1;
+    if (els.modeText) els.modeText.tabIndex = selectedMode === 'text' ? 0 : -1;
+    updateSessionPreview();
   }
 
   function initModePicker() {
-    if (els.modeVoice) els.modeVoice.addEventListener('click', function () { setSelectedMode('voice'); });
-    if (els.modeText) els.modeText.addEventListener('click', function () { setSelectedMode('text'); });
+    if (els.modeVoice) els.modeVoice.addEventListener('click', function () { setSelectedMode('voice'); saveSetupContext(); });
+    if (els.modeText) els.modeText.addEventListener('click', function () { setSelectedMode('text'); saveSetupContext(); });
+    [els.modeVoice, els.modeText].forEach(function (button) {
+      button.addEventListener('keydown', function (event) {
+        if (['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].indexOf(event.key) < 0) return;
+        event.preventDefault();
+        var next = selectedMode === 'voice' || !appVoiceAvailable ? 'text' : 'voice';
+        setSelectedMode(next);
+        (next === 'voice' ? els.modeVoice : els.modeText).focus();
+        saveSetupContext();
+      });
+    });
   }
 
   // --------------------------------------------------------- advanced toggle
@@ -81,6 +95,7 @@
     function sync() {
       chips.forEach(function (c) {
         c.classList.toggle('active', c.dataset.value === selectEl.value);
+        c.setAttribute('aria-pressed', String(c.dataset.value === selectEl.value));
       });
     }
     chips.forEach(function (c) {
@@ -98,6 +113,7 @@
 
   function saveSetupContext() {
     var ctx = {
+      mode: selectedMode,
       position: els.position.value,
       interviewType: els.interviewType.value,
       difficulty: els.difficulty.value,
@@ -108,24 +124,31 @@
       jobDescription: els.jobDescription.value,
       companyInfo: els.companyInfo.value,
     };
-    try { localStorage.setItem(SETUP_KEY, JSON.stringify(ctx)); } catch (e) { /* ignore */ }
+    var saved = true;
+    try { localStorage.setItem(SETUP_KEY, JSON.stringify(ctx)); } catch (e) { saved = false; }
     if (els.autosaveHint) {
+      els.autosaveHint.textContent = saved ? 'Settings saved on this device' : 'Settings could not be saved on this device';
       els.autosaveHint.classList.add('visible');
       clearTimeout(els.autosaveHint._t);
       els.autosaveHint._t = setTimeout(function () {
         els.autosaveHint.classList.remove('visible');
       }, 1600);
     }
+    updateSessionPreview();
   }
 
   function loadSetupContext() {
     var ctx = null;
     try { ctx = JSON.parse(localStorage.getItem(SETUP_KEY)) || null; } catch (e) { ctx = null; }
     if (!ctx || !els.position) return;
-    if (ctx.position && els.position.querySelector('option[value="' + ctx.position + '"]')) els.position.value = ctx.position;
-    if (ctx.interviewType && els.interviewType.querySelector('option[value="' + ctx.interviewType + '"]')) els.interviewType.value = ctx.interviewType;
-    if (ctx.difficulty && els.difficulty.querySelector('option[value="' + ctx.difficulty + '"]')) els.difficulty.value = ctx.difficulty;
-    if (ctx.questionCount && els.questionCount.querySelector('option[value="' + ctx.questionCount + '"]')) els.questionCount.value = ctx.questionCount;
+    function restore(select, value) {
+      if (Array.from(select.options).some(function (option) { return option.value === value; })) select.value = value;
+    }
+    restore(els.position, ctx.position);
+    restore(els.interviewType, ctx.interviewType);
+    restore(els.difficulty, ctx.difficulty);
+    restore(els.questionCount, ctx.questionCount);
+    if (ctx.mode) setSelectedMode(ctx.mode);
     if (ctx.customPosition) els.customPosition.value = ctx.customPosition;
     if (ctx.customCount) els.customCount.value = String(ctx.customCount);
     if (ctx.resume) els.resume.value = ctx.resume;
@@ -146,40 +169,70 @@
   function toggleCustomFields() {
     els.customPositionField.classList.toggle('hidden', els.position.value !== 'Custom Position');
     els.customCountField.classList.toggle('hidden', els.questionCount.value !== 'custom');
+    els.customPosition.required = els.position.value === 'Custom Position';
+    els.customCount.required = els.questionCount.value === 'custom';
+    els.customCount.disabled = els.questionCount.value !== 'custom';
+    updateSessionPreview();
+  }
+
+  function updateSessionPreview() {
+    var preview = document.getElementById('session-preview');
+    if (!preview) return;
+    var count = els.questionCount.value === 'custom' ? els.customCount.value : els.questionCount.value;
+    preview.textContent = count + (Number(count) === 1 ? ' question' : ' questions') + ' / ' + UI.titleCase(els.difficulty.value) + ' / ' + UI.titleCase(els.interviewType.value) + ' / ' + UI.titleCase(selectedMode);
+    document.querySelectorAll('[data-preset]').forEach(function (button) {
+      var preset = button.dataset.preset;
+      var matches = els.interviewType.value === (preset === 'starter' ? 'mixed' : preset) && els.difficulty.value === (preset === 'starter' ? 'beginner' : 'intermediate') && els.questionCount.value === (preset === 'technical' ? '10' : '5');
+      button.setAttribute('aria-pressed', String(matches));
+    });
   }
 
   function checkServerStatus() {
-    UI.api('/api/status')
+    serviceReady = false;
+    els.startBtn.disabled = true;
+    els.textBtn.disabled = true;
+    var retry = document.getElementById('retry-connection');
+    if (retry) retry.classList.add('hidden');
+    UI.setBanner(els.serverStatus, 'processing', 'Checking the interview service...');
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); }, 10000);
+    UI.api('/api/status', { signal: controller.signal })
       .then(function (data) {
-        appVoiceAvailable = !!data.gemini.voiceAvailable;
+        appVoiceAvailable = !!(data.gemini && data.gemini.voiceAvailable);
+        els.modeVoice.disabled = !appVoiceAvailable;
+        els.modeVoice.querySelector('.mode-desc').textContent = appVoiceAvailable ? 'Talk with the AI interviewer' : 'Unavailable right now; use text';
         if (!appVoiceAvailable) setSelectedMode('text');
-        if (data.gemini.configured) {
+        if (data.gemini && data.gemini.configured) {
           var voiceNote = appVoiceAvailable
-            ? ' Voice: ' + (data.gemini.liveModel || 'on')
-            : ' Voice is not available on this setup; text mode will be used.';
+            ? 'Voice and text practice are ready.'
+            : 'Text practice is ready. Voice is currently unavailable.';
           UI.setBanner(
             els.serverStatus,
             'ok',
-            'Connected. AI model: ' + data.gemini.model + '.' + voiceNote
+            voiceNote
           );
           UI.setTopState('ok', 'Connected');
           els.startBtn.disabled = false;
+          els.textBtn.disabled = false;
+          serviceReady = true;
         } else {
           UI.setBanner(
             els.serverStatus,
             'error',
-            'Connected, but GEMINI_API_KEY is missing. Add it to .env and restart the server.'
+            'AI practice is not configured yet. You can still try the sample warm-up.'
           );
-          UI.setTopState('error', 'No API key');
+          UI.setTopState('error', 'AI unavailable');
           els.startBtn.disabled = true;
+          if (retry) retry.classList.remove('hidden');
         }
       })
       .catch(function (err) {
         console.error('Server status check failed:', err && err.message);
-        UI.setBanner(els.serverStatus, 'error', 'Cannot connect to server. Is it running?');
+        UI.setBanner(els.serverStatus, 'error', 'AI practice is temporarily unreachable. Try again or use the sample warm-up.');
         UI.setTopState('error', 'Offline');
         els.startBtn.disabled = true;
-      });
+        if (retry) retry.classList.remove('hidden');
+      }).finally(function () { clearTimeout(timeout); });
   }
 
   // --------------------------------------------------------- config
@@ -206,7 +259,9 @@
   }
 
   function setBusy(busy) {
-    els.startBtn.disabled = busy;
+    els.startBtn.disabled = busy || !serviceReady;
+    els.textBtn.disabled = busy || !serviceReady;
+    els.setupForm.setAttribute('aria-busy', String(busy));
     els.startBtn.textContent = busy ? 'Starting\u2026' : 'Start interview';
   }
 
@@ -220,12 +275,14 @@
 
   function requireLogin() {
     if (window.Auth && window.Auth.isLoggedIn()) return true;
+    saveSetupContext();
     UI.flash('Sign in to start an interview.');
     location.href = 'login.html';
     return false;
   }
 
   function startInterview() {
+    if (!serviceReady || !validateSetup()) return;
     if (!requireLogin()) return;
     var config = collectConfig();
     if (!appVoiceAvailable) {
@@ -265,6 +322,7 @@
   }
 
   function textModeStart(forceConfig) {
+    if (!serviceReady || !validateSetup()) return;
     if (!requireLogin()) return;
     var config = forceConfig || collectConfig();
     config.mode = 'text';
@@ -369,6 +427,48 @@
 
   UI.renderHistory = renderHistory;
 
+  function validateSetup() {
+    if (els.position.value === 'Custom Position' && !els.customPosition.value.trim()) {
+      els.customPosition.setCustomValidity('Enter the role you want to practice for.');
+    } else {
+      els.customPosition.setCustomValidity('');
+    }
+    if (!els.setupForm.checkValidity()) {
+      if (els.advancedToggle.getAttribute('aria-expanded') !== 'true' && els.questionCount.value === 'custom') els.advancedToggle.click();
+      els.setupForm.reportValidity();
+      return false;
+    }
+    return true;
+  }
+
+  els.customPosition.addEventListener('input', function () { els.customPosition.setCustomValidity(''); });
+  document.querySelectorAll('[data-preset]').forEach(function (button) {
+    button.setAttribute('aria-pressed', 'false');
+    button.addEventListener('click', function () {
+      var preset = button.dataset.preset;
+      els.interviewType.value = preset === 'starter' ? 'mixed' : preset;
+      els.difficulty.value = preset === 'starter' ? 'beginner' : 'intermediate';
+      els.questionCount.value = preset === 'technical' ? '10' : '5';
+      [els.interviewType, els.difficulty, els.questionCount].forEach(function (field) { field.dispatchEvent(new Event('change', { bubbles: true })); });
+      document.querySelectorAll('[data-preset]').forEach(function (item) { item.setAttribute('aria-pressed', String(item === button)); });
+      UI.toast('Practice focus updated. Your role and context are kept.');
+    });
+  });
+  document.getElementById('retry-connection').addEventListener('click', checkServerStatus);
+  document.getElementById('forget-context').addEventListener('click', function () {
+    try { localStorage.removeItem(SETUP_KEY); } catch (e) {
+      UI.toast('Could not clear saved context. Check your browser storage settings.');
+      return;
+    }
+    els.resume.value = '';
+    els.jobDescription.value = '';
+    els.companyInfo.value = '';
+    els.customPosition.value = '';
+    els.customPosition.setCustomValidity('');
+    els.autosaveHint.textContent = 'Saved context cleared from this device';
+    UI.toast('Setup draft cleared. Account sessions are unchanged.');
+  });
+
   // --------------------------------------------------------- wiring
 
   els.setupForm.addEventListener('submit', function (e) {
@@ -381,6 +481,8 @@
   });
   els.textBtn.addEventListener('click', function (e) {
     e.preventDefault();
+    setSelectedMode('text');
+    saveSetupContext();
     textModeStart();
   });
   els.position.addEventListener('change', toggleCustomFields);
@@ -397,7 +499,7 @@
           })
           .catch(function () {
             renderHistory();
-            UI.toast('History cleared.');
+            UI.toast('Could not clear account history. Please try again.');
           });
       } else {
         renderHistory();
@@ -415,6 +517,9 @@
   // --------------------------------------------------------- init
 
   loadSetupContext();
+  setSelectedMode(selectedMode);
+  els.textBtn.disabled = true;
+  if (window.Auth && window.Auth.isLoggedIn()) document.getElementById('signin-hint').textContent = 'Your session and feedback will be saved to your account.';
   toggleCustomFields();
   initPicker('position-chips', els.position);
   initPicker('type-chips', els.interviewType);

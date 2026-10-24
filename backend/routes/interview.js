@@ -1,5 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { accountDailyLimit, accountStartLimit } = require('../security/quotas');
 const {
   RequestError,
   validateConfig,
@@ -8,6 +9,46 @@ const {
 } = require('../interview/engine');
 
 const router = express.Router();
+
+// An account remains limited when its owner changes IP addresses.
+router.use(rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  keyGenerator: req => req.user.id,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many practice requests. Please wait a minute.' },
+}));
+router.use(accountDailyLimit);
+
+router.param('id', async (req, res, next, id) => {
+  try {
+    const session = await getSession(id);
+    if (!session || String(session.userId) !== String(req.user.id)) {
+      return res.status(404).json({ error: 'Interview not found.' });
+    }
+    req.interviewSession = session;
+    next();
+  } catch (error) { next(error); }
+});
+
+function acquireSession(req, res) {
+  const session = req.interviewSession;
+  if (!session) return true;
+  if (session._httpBusy || (session._voiceActive && req.method === 'POST')) {
+    res.status(409).json({ error: 'This interview is processing another request or voice session. Please wait.' });
+    return false;
+  }
+  session._httpBusy = true;
+  return true;
+}
+
+function sendQuotaError(res, error) {
+  if (!['QUOTA_EXCEEDED', 'QUOTA_UNAVAILABLE', 'AI_INPUT_TOO_LARGE'].includes(error.code)) return false;
+  if (error.retryAfter) res.set('Retry-After', String(error.retryAfter));
+  res.status(error.status).json({ error: error.message });
+  return true;
+}
 
 const interviewLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -21,7 +62,8 @@ const answerLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down.' },
 });
 
-router.post('/start', interviewLimiter, async (req, res) => {
+router.post('/start', interviewLimiter, accountStartLimit, async (req, res) => {
+  if (!acquireSession(req, res)) return;
   try {
     const config = validateConfig(req.body);
     const session = await createSession(config, {
@@ -50,17 +92,21 @@ router.post('/start', interviewLimiter, async (req, res) => {
     }
     res.json(result);
   } catch (err) {
+    if (sendQuotaError(res, err)) return;
     if (err instanceof RequestError) {
       return res.status(err.status).json({ error: err.message });
     }
     console.error('Interview start failed:', err.message);
     res.status(502).json({ error: 'The AI interviewer is temporarily unavailable. Please try again.' });
+  } finally {
+    if (req.interviewSession) req.interviewSession._httpBusy = false;
   }
 });
 
 router.post('/:id/text-start', interviewLimiter, async (req, res) => {
+  if (!acquireSession(req, res)) return;
   try {
-    const session = await getSession(req.params.id);
+    const session = req.interviewSession;
     if (!session) return res.status(404).json({ error: 'Interview not found.' });
     if (session.status === 'completed') {
       return res.status(409).json({ error: 'This interview is already finished.' });
@@ -81,17 +127,21 @@ router.post('/:id/text-start', interviewLimiter, async (req, res) => {
       summary: session.summary(),
     });
   } catch (err) {
+    if (sendQuotaError(res, err)) return;
     if (err instanceof RequestError) {
       return res.status(err.status).json({ error: err.message });
     }
     console.error('Text start failed:', err.message);
     res.status(502).json({ error: 'The AI interviewer is temporarily unavailable. Please try again.' });
+  } finally {
+    if (req.interviewSession) req.interviewSession._httpBusy = false;
   }
 });
 
 router.post('/:id/answer', answerLimiter, async (req, res) => {
+  if (!acquireSession(req, res)) return;
   try {
-    const session = await getSession(req.params.id);
+    const session = req.interviewSession;
     if (!session) return res.status(404).json({ error: 'Interview not found.' });
     if (session.status === 'completed') {
       return res.status(409).json({ error: 'This interview is already finished.' });
@@ -99,31 +149,39 @@ router.post('/:id/answer', answerLimiter, async (req, res) => {
     const result = await session.answer(req.body && req.body.answer);
     return res.json({ ...result, summary: session.summary() });
   } catch (err) {
+    if (sendQuotaError(res, err)) return;
     if (err instanceof RequestError) {
       return res.status(err.status).json({ error: err.message });
     }
     console.error('Interview answer failed:', err.message);
     res.status(502).json({ error: 'The AI interviewer is temporarily unavailable. Please try again.' });
+  } finally {
+    if (req.interviewSession) req.interviewSession._httpBusy = false;
   }
 });
 
 router.get('/:id', async (req, res) => {
+  if (!acquireSession(req, res)) return;
   try {
-    const session = await getSession(req.params.id);
+    const session = req.interviewSession;
     if (!session) return res.status(404).json({ error: 'Interview not found.' });
     if (session.status === 'completed') {
       await session.evaluate();
     }
     res.json(session.summary());
   } catch (err) {
+    if (sendQuotaError(res, err)) return;
     console.error('Interview summary failed:', err.message);
     res.status(502).json({ error: 'Could not load the interview summary.' });
+  } finally {
+    if (req.interviewSession) req.interviewSession._httpBusy = false;
   }
 });
 
 router.post('/:id/hint', answerLimiter, async (req, res) => {
+  if (!acquireSession(req, res)) return;
   try {
-    const session = await getSession(req.params.id);
+    const session = req.interviewSession;
     if (!session) return res.status(404).json({ error: 'Interview not found.' });
     if (session.status === 'completed') {
       return res.status(409).json({ error: 'This interview is already finished.' });
@@ -131,17 +189,21 @@ router.post('/:id/hint', answerLimiter, async (req, res) => {
     const { hint } = await session.hint();
     res.json({ hint });
   } catch (err) {
+    if (sendQuotaError(res, err)) return;
     if (err instanceof RequestError) {
       return res.status(err.status).json({ error: err.message });
     }
     console.error('Hint failed:', err.message);
     res.status(502).json({ error: 'The AI could not generate a hint right now. Please try again.' });
+  } finally {
+    if (req.interviewSession) req.interviewSession._httpBusy = false;
   }
 });
 
 router.post('/:id/finalize', async (req, res) => {
+  if (!acquireSession(req, res)) return;
   try {
-    const session = await getSession(req.params.id);
+    const session = req.interviewSession;
     if (!session) return res.status(404).json({ error: 'Interview not found.' });
     if (session.status === 'completed') {
       return res.status(409).json({ error: 'This interview is already finished.' });
@@ -153,14 +215,18 @@ router.post('/:id/finalize', async (req, res) => {
     await session._persist();
     res.json({ success: true });
   } catch (err) {
+    if (sendQuotaError(res, err)) return;
     console.error('Finalize failed:', err.message);
     res.status(502).json({ error: 'Could not finalize the interview.' });
+  } finally {
+    if (req.interviewSession) req.interviewSession._httpBusy = false;
   }
 });
 
 router.get('/:id/rating', async (req, res) => {
+  if (!acquireSession(req, res)) return;
   try {
-    const session = await getSession(req.params.id);
+    const session = req.interviewSession;
     if (!session) return res.status(404).json({ error: 'Interview not found.' });
     if (session.status === 'completed') {
       return res.status(409).json({ error: 'This interview is already finished.' });
@@ -168,8 +234,11 @@ router.get('/:id/rating', async (req, res) => {
     const rating = await session.rating();
     res.json(rating);
   } catch (err) {
+    if (sendQuotaError(res, err)) return;
     console.error('Rating failed:', err.message);
     res.status(502).json({ error: 'Could not generate your rating right now. Please try again.' });
+  } finally {
+    if (req.interviewSession) req.interviewSession._httpBusy = false;
   }
 });
 

@@ -8,10 +8,9 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#07090d" />
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f7fb" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script>(function(){var t;try{t=localStorage.getItem('ai-interviewer:theme')}catch(e){}if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',t)})();</script>
   <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/practice.css" />
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -61,9 +60,18 @@
 
       <div class="summary-chips" id="summary-chips"></div>
 
+      <section id="next-practice" class="panel-card next-practice hidden" aria-labelledby="next-practice-title">
+        <p class="eyebrow">TURN FEEDBACK INTO PRACTICE</p>
+        <h2 class="card-title" id="next-practice-title">Your next practice plan</h2>
+        <p id="practice-focus"></p>
+        <ol id="practice-tasks" class="practice-tasks"></ol>
+        <button type="button" id="practice-focus-btn" class="btn primary">Set up focused practice</button>
+        <p class="assessment-note">AI scores are practice guidance, not a hiring prediction. These steps are suggested exercises based on your lowest scored skill.</p>
+      </section>
+
       <div class="results-grid">
         <div class="panel-card" id="rating-card">
-          <h2 class="card-title">Candidate rating</h2>
+          <h2 class="card-title">Practice feedback</h2>
           <div class="rating-overall">
             <div class="ring-wrap">
               <svg class="score-ring" viewBox="0 0 120 120" aria-hidden="true">
@@ -83,7 +91,7 @@
         </div>
 
         <div class="panel-card">
-          <h2 class="card-title">Impulse stats</h2>
+          <h2 class="card-title">Answer insights</h2>
           <div id="stats-grid" class="stats-grid"></div>
           <h3 class="block-label">Words per question</h3>
           <div id="words-chart" class="chart-host"></div>

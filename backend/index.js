@@ -22,7 +22,7 @@ const { initLiveServer } = require('./live/manager');
 const store = require('./interview/store');
 
 const app = express();
-app.set('trust proxy', 1);
+app.set('trust proxy', config.trustProxy);
 const PORT = config.port;
 
 // Global Security Hardening: Helmet protection against clickjacking, XSS, and general exploits
@@ -52,7 +52,7 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 app.use(cors({ origin: config.webUrl, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: '96kb' }));
 
 app.use(express.static('public'));
 
@@ -113,6 +113,11 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
+  if (err.code === 'QUOTA_EXCEEDED' || err.code === 'QUOTA_UNAVAILABLE') {
+    res.set('Retry-After', String(err.retryAfter));
+    return res.status(err.status).json({ error: err.message });
+  }
+  if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Request is too large. Please shorten your context or answer.' });
   console.error('Server error:', err);
   res.status(500).json({ 
     error: err.message || 'Internal server error', 

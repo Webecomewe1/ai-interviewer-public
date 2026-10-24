@@ -186,7 +186,7 @@
     if (!stats) {
       var empty = document.createElement('p');
       empty.className = 'panel-note';
-      empty.textContent = 'No impulse stats available for this session.';
+      empty.textContent = 'No answer insights available for this session.';
       els.statsGrid.appendChild(empty);
       return;
     }
@@ -312,6 +312,7 @@
     els.ratingCard.classList.toggle('hidden', !evalAvailable);
 
     renderRating(summary.evaluation);
+    renderPracticePlan(summary);
     renderSummaryChips(summary);
     renderStats(summary.stats);
     renderWordsChart(summary);
@@ -329,6 +330,52 @@
       status: 'completed',
       score: evalAvailable ? Number(summary.evaluation.overall) : null,
     });
+  }
+
+  function renderPracticePlan(summary) {
+    var panel = document.getElementById('next-practice');
+    var evaluation = summary.evaluation;
+    var dimensions = RATING_DIMS.filter(function (dim) {
+      return evaluation && evaluation[dim[0]] != null && Number.isFinite(Number(evaluation[dim[0]]));
+    }).sort(function (a, b) { return Number(evaluation[a[0]]) - Number(evaluation[b[0]]); });
+    panel.classList.toggle('hidden', !dimensions.length);
+    if (!dimensions.length) return;
+    var focus = dimensions[0];
+    var technical = focus[0] === 'technical' || focus[0] === 'problemSolving';
+    document.getElementById('practice-focus').textContent = 'Focus on ' + focus[1].toLowerCase() + ' (' + Number(evaluation[focus[0]]) + '/10). This was your lowest scored area in this session; tied areas are shown in rubric order.';
+    var tasks = technical ? [
+      'Pick one technical answer from the transcript and identify a missing detail or unclear assumption.',
+      'Explain your approach again, including an alternative and why you chose your solution.',
+      'Try a five-question technical session for the same role.'
+    ] : [
+      'Pick one answer from your transcript and identify where your message became unclear.',
+      'Rewrite it using a real situation, your task, the actions you took, and the result.',
+      'Try a five-question behavioral session, keeping your own contribution clear.'
+    ];
+    var list = document.getElementById('practice-tasks');
+    list.replaceChildren();
+    tasks.forEach(function (task) {
+      var item = document.createElement('li');
+      item.textContent = task;
+      list.appendChild(item);
+    });
+    document.getElementById('practice-focus-btn').onclick = function () {
+      var draft = {};
+      try { draft = JSON.parse(localStorage.getItem('ai-interviewer:setup')) || {}; } catch (e) { /* use session settings */ }
+      draft.position = summary.position;
+      draft.customPosition = summary.customPosition || '';
+      draft.difficulty = summary.difficulty || 'intermediate';
+      draft.interviewType = technical ? 'technical' : 'behavioral';
+      draft.questionCount = '5';
+      draft.mode = 'text';
+      try { localStorage.setItem('ai-interviewer:setup', JSON.stringify(draft)); } catch (e) {
+        UI.toast('Your browser could not save the practice plan. Return to setup and choose five questions.');
+        return;
+      }
+      UI.clearSession();
+      UI.flash('Five-question ' + draft.interviewType + ' practice is ready to review.');
+      location.href = 'index.html#setup-form';
+    };
   }
 
   // --------------------------------------------------------- export

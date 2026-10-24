@@ -27,6 +27,9 @@ function validateConfig(body) {
   const input = body || {};
   const position = String(input.position || '').trim();
   if (!position) throw new RequestError('A position is required.');
+  if (position === 'Custom Position' && !String(input.customPosition || '').trim()) {
+    throw new RequestError('Enter the role you want to practice for.');
+  }
 
   const interviewType = String(input.interviewType || '').trim();
   if (!VALID_TYPES.includes(interviewType)) {
@@ -102,7 +105,10 @@ class InterviewSession {
     this.lastDifficulty = config.difficulty;
     this.evaluation = null;
     this.evaluationPromise = null;
-    this._cacheEnabled = opts.cacheEnabled !== undefined ? opts.cacheEnabled : true;
+    // Shared role questions cannot account for private candidate or job context.
+    // Keep personalized prompts out of both cache reads and shared cache writes.
+    const hasContext = Boolean(config.resume || config.jobDescription || config.companyInfo);
+    this._cacheEnabled = !hasContext && (opts.cacheEnabled !== undefined ? opts.cacheEnabled : true);
   }
 
   _persist() {
@@ -135,7 +141,7 @@ class InterviewSession {
       });
       opening = String(result.opening || '').trim();
       question = String(result.question || '').trim();
-      await saveGeneratedQuestion({
+      if (this._cacheEnabled) await saveGeneratedQuestion({
         position: this.config.position,
         customPosition: this.config.customPosition,
         interviewType: this.config.interviewType,
@@ -218,7 +224,7 @@ class InterviewSession {
       });
       questionData = generatedResult.question || {};
       questionSource = 'generated';
-      await saveGeneratedQuestion({
+      if (this._cacheEnabled) await saveGeneratedQuestion({
         position: this.config.position,
         customPosition: this.config.customPosition,
         interviewType: this.config.interviewType,
@@ -276,14 +282,7 @@ class InterviewSession {
   }
 
   async rating() {
-    if (this.evaluation) return this.evaluation;
-    try {
-      return await this.evaluate();
-    } catch (err) {
-      const fallbackScores = { technical: 7, problemSolving: 7, communication: 7, clarity: 7, confidence: 7, adaptability: 7 };
-      const ev = normalizeEval(fallbackScores);
-      return { ...ev, overall: 7.0 };
-    }
+    return this.evaluate();
   }
 
   async evaluate() {
@@ -326,32 +325,14 @@ class InterviewSession {
           this.evaluation = { ...ev, overall: Math.round(average * 2) / 2 };
           await this._persist();
         } catch (err) {
-          console.error(`[${new Date().toISOString()}] [EVALUATION_FALLBACK_TRIGGER] Evaluation failed:`, err && err.message);
-          const fallbackScores = {};
-          const ansWithEval = this.answers.filter((a) => a && a.eval);
-          for (const d of dims) {
-            if (ansWithEval.length) {
-              const sum = ansWithEval.reduce((acc, a) => acc + (Number(a.eval[d]) || 7), 0);
-              fallbackScores[d] = Math.round(sum / ansWithEval.length);
-            } else {
-              fallbackScores[d] = 7;
-            }
-          }
-           const ev = normalizeEval(fallbackScores);
-           const average = dims.reduce((acc, d) => acc + ev[d], 0) / dims.length;
-           this.evaluation = {
-             ...ev,
-             overall: Math.round(average * 2) / 2,
-             note: `Based on your answers, here are your strengths and areas for improvement:
-             - You demonstrated strong ${ev.communication >= 8 ? 'communication' : 'communication skills'}.
-             - Focus on ${ev.clarity < 7 ? 'structuring answers with clear examples' : 'adding technical depth'} for future interviews.
-             - Consider practicing ${ev.confidence < 7 ? 'confidence' : 'clarity'} in technical discussions.
-             - Review ${ev.adaptability < 7 ? 'adaptability' : 'problem-solving'} in complex scenarios.`,
-           };
-           await this._persist();
+          // Preserve quota/service errors; never invent a score on failure.
+          throw err;
         }
         return this.evaluation;
-      })();
+      })().catch((error) => {
+        this.evaluationPromise = null;
+        throw error;
+      });
     }
     return this.evaluationPromise;
   }
@@ -470,6 +451,9 @@ async function getSession(id) {
     interviewType: doc.config.interviewType,
     difficulty: doc.config.difficulty,
     questionCount: doc.config.questionCount,
+    resume: doc.config.resume || '',
+    jobDescription: doc.config.jobDescription || '',
+    companyInfo: doc.config.companyInfo || '',
   };
   const session = new InterviewSession(config, {
     id: doc._id.toString(),

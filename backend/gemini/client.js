@@ -1,7 +1,14 @@
 const { GoogleGenAI } = require('@google/genai');
 const config = require('../config');
+const { consumeQuota, DAY } = require('../security/quotas');
 
 let client = null;
+
+function validateInput(prompt, systemInstruction) {
+  if (Buffer.byteLength(String(prompt || '') + String(systemInstruction || ''), 'utf8') > 160 * 1024) {
+    throw Object.assign(new Error('This interview context is too long. Please use shorter answers or start a shorter session.'), { status: 413, code: 'AI_INPUT_TOO_LARGE' });
+  }
+}
 
 function getClient() {
   if (!client) {
@@ -26,41 +33,45 @@ function apiKey() {
 }
 
 let cachedLiveModel = null;
+let liveModelCheckedAt = 0;
+let liveModelPending = null;
 
 async function resolveLiveModel() {
   if (config.gemini.liveModel) return config.gemini.liveModel;
-  if (cachedLiveModel !== null) return cachedLiveModel;
+  if (Date.now() - liveModelCheckedAt < 5 * 60 * 1000) return cachedLiveModel;
+  if (liveModelPending) return liveModelPending;
 
   if (!apiKey()) {
     cachedLiveModel = null;
     return null;
   }
 
-  try {
-    const url =
-      'https://generativelanguage.googleapis.com/v1beta/models?key=' +
-      encodeURIComponent(apiKey());
-    const res = await fetch(url);
-    if (!res.ok) {
+  liveModelPending = (async () => {
+    try {
+      const url =
+        'https://generativelanguage.googleapis.com/v1beta/models?key=' +
+        encodeURIComponent(apiKey());
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) {
+        cachedLiveModel = null;
+        return null;
+      }
+      const data = await res.json();
+      const names = (data.models || [])
+        .map((m) => (m.name || '').replace(/^models\//, ''))
+        .filter(Boolean);
+      const preferred = names.find((n) => /native-audio-latest|native-audio/i.test(n));
+      const genericLive = names.find((n) => /live/i.test(n));
+      cachedLiveModel = preferred || genericLive || null;
+      return cachedLiveModel;
+    } catch (e) {
       cachedLiveModel = null;
       return null;
+    } finally {
+      liveModelCheckedAt = Date.now();
     }
-    const data = await res.json();
-    const names = (data.models || [])
-      .map((m) => (m.name || '').replace(/^models\//, ''))
-      .filter(Boolean);
-    const preferred = names.find((n) => /native-audio-latest|native-audio/i.test(n));
-    const genericLive = names.find((n) => /live/i.test(n));
-    cachedLiveModel = preferred || genericLive || null;
-    return cachedLiveModel;
-  } catch (e) {
-    cachedLiveModel = null;
-    return null;
-  }
-}
-
-function apiKey() {
-  return config.gemini.apiKey;
+  })().finally(() => { liveModelPending = null; });
+  return liveModelPending;
 }
 
 function isConfigured() {
@@ -73,6 +84,8 @@ async function verifyKey() {
 }
 
 async function generateText({ prompt, systemInstruction, temperature = 0.7 }) {
+  validateInput(prompt, systemInstruction);
+  await consumeQuota('provider-calls-day', 'all', config.limits.aiCallsPerDay, DAY, 'AI practice has reached its daily service limit. Please try again after the reset.');
   const request = {
     model: getModel(),
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -83,6 +96,8 @@ async function generateText({ prompt, systemInstruction, temperature = 0.7 }) {
   }
   request.config = request.config || {};
   request.config.temperature = temperature;
+  request.config.maxOutputTokens = 2048;
+  request.config.httpOptions = { timeout: 60000 };
 
   const response = await getClient().models.generateContent(request);
   const text = response && response.text;
@@ -90,12 +105,16 @@ async function generateText({ prompt, systemInstruction, temperature = 0.7 }) {
 }
 
 async function generateJson({ prompt, systemInstruction, schema, temperature = 0.6 }) {
+  validateInput(prompt, systemInstruction);
+  await consumeQuota('provider-calls-day', 'all', config.limits.aiCallsPerDay, DAY, 'AI practice has reached its daily service limit. Please try again after the reset.');
   const request = {
     model: getModel(),
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
     config: {
       temperature,
       responseMimeType: 'application/json',
+      maxOutputTokens: 2048,
+      httpOptions: { timeout: 60000 },
     },
   };
   if (systemInstruction) {

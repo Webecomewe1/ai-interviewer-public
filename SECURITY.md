@@ -268,87 +268,13 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 ## Rate Limiting
 
-### Multi-Tier Rate Limits
+See [API_ABUSE_PROTECTION.md](API_ABUSE_PROTECTION.md) for the current limits, environment settings, storage behavior, test coverage and deployment requirements.
 
-**Global API limiter** (all `/api/` endpoints):
-- **Limit**: 100 requests per 15 minutes per IP
-- **Headers**: `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset`
-- **Enforcement**: Returns 429 Too Many Requests if exceeded
+Limits apply to authenticated users as well as IP addresses. Default account quotas are 10 starts per hour and 200 interview requests per UTC day, with a 30-request/minute account burst limit. A shared MongoDB cap admits at most 1,000 text/JSON Gemini generation invocations per UTC day. Voice has separate daily session quotas, frame/audio limits and a maximum connection duration.
 
-**Implementation** (in `index.js`):
-```javascript
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 100,                    // 100 requests per window
-  standardHeaders: true,       // Return RateLimit-* headers
-  legacyHeaders: false,
-  message: { error: 'Too many requests from this IP, please try again after 15 minutes.' }
-});
+Shared quotas fail closed on database outages in production. Responses use 429 with Retry-After when the quota is exhausted, or 503 when the quota store is unavailable. Short IP and account burst limits remain process-local; daily shared quotas persist in MongoDB. Default trust proxy is false; explicitly configure trusted proxy IPs/CIDRs when needed.
 
-app.use('/api/', apiLimiter);
-```
-
-### Authentication-Specific Limits
-
-**Signup/Login** (global API limiter applies)
-
-**OTP verification** (stricter):
-- **Limit**: 10 attempts per 15 minutes per IP
-- **Reason**: Prevent brute-force OTP guessing
-
-**OTP resend** (stricter):
-- **Limit**: 5 resend attempts per 15 minutes per IP
-- **Reason**: Prevent email spam
-
-**Implementation** (in `routes/auth.js`):
-```javascript
-const verifyLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { error: 'Too many verification attempts.' }
-});
-
-router.post('/verify-otp', verifyLimiter, async (req, res) => {
-  // Handle verification
-});
-```
-
-### Interview-Specific Limits
-
-**Session creation**:
-- **Limit**: 20 per hour per IP
-- **Reason**: Prevent abuse (creates expensive Gemini session)
-- **Time window**: 1 hour
-
-**Answer submission/hints**:
-- **Limit**: 30 per minute per IP
-- **Reason**: Prevent rapid API spam
-
-**Implementation** (in `routes/interview.js`):
-```javascript
-const interviewLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,  // 1 hour
-  max: 20,                    // 20 sessions
-  message: { error: 'Too many interview sessions. Try again later.' }
-});
-
-const answerLimiter = rateLimit({
-  windowMs: 60 * 1000,  // 1 minute
-  max: 30,              // 30 requests
-  message: { error: 'Too many requests. Please slow down.' }
-});
-
-router.post('/start', interviewLimiter, async (req, res) => { });
-router.post('/:id/answer', answerLimiter, async (req, res) => { });
-```
-
-### Rate Limit Bypass for Authenticated Users
-
-**Current**: All users subject to same limits (including authenticated)
-
-**Rationale**: Prevents resource exhaustion even from logged-in users
-
-**Consideration**: Could whitelist authenticated users in future by checking `req.user`
+Login now shares the 10-attempt verification limiter, and signup shares the 5-request resend limiter. User-agent filtering is not an authentication or cost-control boundary because clients can change that header.
 
 ## Bot Detection & Mitigation
 
@@ -528,75 +454,11 @@ app.use((err, req, res, next) => {
 
 ## WebSocket Security
 
-### Authentication
+The upgrade handler verifies the JWT, the account's existence and email verification, and ownership/eligibility of the interview before opening a voice provider connection. A supplied Origin must equal WEB_URL. Daily account and global voice reservations happen before provider startup.
 
-**Token requirement** (in `backend/live/manager.js`):
-```javascript
-const token = url.searchParams.get('token');
-if (!token) {
-  ws.close(1008, 'Authentication required');
-  return;
-}
+A worker admits only one pending/active voice connection per account. Inbound frames are limited to 64 KiB, 100 messages and 128 KiB per second. Audio must be valid base64 for 16 kHz PCM and cannot exceed the configured session audio budget. Text is length- and pace-limited. Pre-ready audio is dropped, and upstream streaming stops on invalid traffic, duration expiry or completion.
 
-try {
-  const payload = verifyToken(token);
-  const userId = payload.sub;
-  // Grant access
-} catch (err) {
-  ws.close(1008, 'Invalid or expired token');
-  return;
-}
-```
-
-**Flow**:
-1. Client connects to `/live/<interviewId>?token=<jwt>`
-2. Server verifies JWT signature and expiration
-3. If valid: Allow connection, store session reference
-4. If invalid/expired: Reject with code 1008
-
-### Session Binding
-
-```javascript
-// Verify user owns the interview session
-const session = await store.getSession(interviewId);
-if (session.userId !== userId) {
-  ws.close(1008, 'Access denied');
-  return;
-}
-```
-
-**Prevents**:
-- Unauthorized access to other users' sessions
-- Eavesdropping on other interviews
-- Cross-user data leakage
-
-### Message Validation
-
-All WebSocket messages validated:
-```javascript
-ws.on('message', (data) => {
-  let msg;
-  try {
-    msg = JSON.parse(data);
-  } catch {
-    // Ignore malformed JSON
-    return;
-  }
-  
-  if (!msg.type) {
-    // Ignore messages without type
-    return;
-  }
-  
-  // Validate audio chunks
-  if (msg.type === 'audio') {
-    if (!msg.data || msg.sampleRate !== 16000) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Invalid audio format' }));
-      return;
-    }
-  }
-});
-```
+These controls are separate from Express HTTP middleware. See [API_ABUSE_PROTECTION.md](API_ABUSE_PROTECTION.md) for the process-local concurrency limitation and shared quota guarantees.
 
 ## Environment Security
 
@@ -605,7 +467,7 @@ ws.on('message', (data) => {
 **Must be set** (or app degrades gracefully):
 - `JWT_SECRET` - Secret key for signing tokens (≥32 chars, random)
 - `GEMINI_API_KEY` - Google Gemini API key
-- `MONGO_URI` - MongoDB connection string (optional, falls back to in-memory)
+- `MONGO_URI` - MongoDB connection string (required for shared production AI quotas).
 
 **Handling**:
 - Never hardcode in source code
@@ -626,8 +488,8 @@ if (!jwtSecret || jwtSecret.length < 32) {
 **Development** (NODE_ENV !== 'production'):
 - OTP codes printed to console (for testing)
 - Stack traces visible in API responses
-- CORS relaxed
-- Rate limits disabled (can set via env var)
+- CORS uses the configured WEB_URL.
+- Rate limits remain active; development without a Mongo URI may use process-local quota counters.
 
 **Production** (NODE_ENV === 'production'):
 - OTP codes sent via email only

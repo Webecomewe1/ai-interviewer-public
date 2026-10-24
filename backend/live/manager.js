@@ -5,6 +5,10 @@ const { getSession } = require('../interview/engine');
 const prompts = require('../interview/prompts');
 const LiveVoice = require('../gemini/live');
 const { verifyToken } = require('../auth/token');
+const User = require('../models/User');
+const config = require('../config');
+const { consumeQuota, HOUR, DAY } = require('../security/quotas');
+const { VoiceGuard } = require('../security/voiceGuard');
 
 function safeSend(ws, obj) {
   if (ws && ws.readyState === 1) {
@@ -13,10 +17,18 @@ function safeSend(ws, obj) {
 }
 
 function initLiveServer(httpServer) {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: false });
+  const activeUsers = new Map();
 
-  httpServer.on('upgrade', (req, socket, head) => {
-    const match = req.url.match(/^\/live\/([\w-]+)(\?.*)?$/);
+  httpServer.on('upgrade', async (req, socket, head) => {
+    const reject = (status, message, retryAfter) => {
+      if (socket.destroyed) return;
+      const body = JSON.stringify({ error: message });
+      socket.end(`HTTP/1.1 ${status} Rejected\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\n${retryAfter ? 'Retry-After: ' + retryAfter + '\r\n' : ''}\r\n${body}`);
+    };
+    const origin = req.headers.origin;
+    if (origin && origin !== config.webUrl) return reject(403, 'Origin is not allowed.');
+    const match = (req.url || '').match(/^\/live\/([\w-]+)(\?.*)?$/);
     if (!match) {
       socket.destroy();
       return;
@@ -24,17 +36,41 @@ function initLiveServer(httpServer) {
     const interviewId = decodeURIComponent(match[1]);
     const query = match[2] ? match[2].slice(1) : '';
     const token = new URLSearchParams(query).get('token');
-    let authed = false;
-    if (token) {
-      try { authed = Boolean(verifyToken(token)); } catch (e) { authed = false; }
+    let userId;
+    let reserved = false;
+    let reservedSession;
+    const release = () => {
+      if (activeUsers.get(userId) === socket) {
+        activeUsers.delete(userId);
+        if (reservedSession) reservedSession._voiceActive = false;
+      }
+    };
+    try {
+      await consumeQuota('voice-upgrade-ip', req.socket.remoteAddress, 30, HOUR);
+      let payload;
+      try { payload = verifyToken(token); } catch (_) { return reject(401, 'Authentication required.'); }
+      userId = String(payload.sub || '');
+      const user = await User.findById(userId).select('emailVerified').lean();
+      if (!user || !user.emailVerified) return reject(401, 'A verified account is required.');
+      const session = await getSession(interviewId);
+      if (!session || String(session.userId) !== userId) return reject(404, 'Interview not found.');
+      if (session.status === 'completed' || session.startedAt !== null || session.config.mode !== 'voice' || session._httpBusy) return reject(409, 'This interview is not available for voice.');
+      if (activeUsers.has(userId)) return reject(409, 'A voice interview is already active for this account.');
+      activeUsers.set(userId, socket);
+      reservedSession = session;
+      session._voiceActive = true;
+      reserved = true;
+      socket.once('close', release);
+      await consumeQuota('voice-account-day', userId, config.limits.voiceSessionsPerDay, DAY, 'Your daily voice session limit has been reached.');
+      await consumeQuota('voice-global-day', 'all', config.limits.globalVoiceSessionsPerDay, DAY, 'The daily voice service limit has been reached.');
+      if (socket.destroyed) { release(); return; }
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, interviewId);
+      });
+    } catch (error) {
+      if (reserved) release();
+      reject(error.status || 503, error.code ? error.message : 'Voice practice is temporarily unavailable.', error.retryAfter);
     }
-    if (!authed) {
-      socket.destroy();
-      return;
-    }
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit('connection', ws, interviewId);
-    });
   });
 
   wss.on('connection', (ws, interviewId) => {
@@ -73,6 +109,19 @@ async function attachVoice(ws, interviewId) {
   }
 
   const voice = new LiveVoice();
+  const guard = new VoiceGuard(config.limits.voiceMaxMinutes);
+  let ready = false;
+  const stop = (reason) => {
+    voice.close();
+    ws.close(1008, reason);
+    const terminateTimer = setTimeout(() => ws.terminate(), 1000);
+    terminateTimer.unref();
+  };
+  const durationTimer = setTimeout(() => {
+    safeSend(ws, { type: 'error', message: 'The voice session time limit has been reached. Start a new session to keep practicing.' });
+    stop('Voice time limit reached');
+  }, config.limits.voiceMaxMinutes * 60 * 1000);
+  durationTimer.unref();
   let currentModelText = '';
   let currentCandidateText = '';
   let modelTurns = 0;
@@ -96,12 +145,16 @@ async function attachVoice(ws, interviewId) {
     completed = true;
     session.status = 'completed';
     session.completedAt = Date.now();
-    if (!opts || !opts.skipEval) {
-      await session.evaluate();
-    } else {
-      await persistSession();
+    // Stop streaming as soon as the interview is completed, even while scoring.
+    voice.close();
+    try {
+      if (!opts || !opts.skipEval) await session.evaluate();
+    } catch (error) {
+      safeSend(ws, { type: 'error', message: error.code ? error.message : 'Your interview is saved, but feedback is temporarily unavailable.' });
     }
+    await session._persist();
     safeSend(ws, { type: 'complete', questionCount: session.config.questionCount });
+    ws.close(1000, 'Interview completed');
   };
 
   const sendAssessmentPrompt = () => {
@@ -283,15 +336,18 @@ async function attachVoice(ws, interviewId) {
 
   voice.onOpen = () => {};
   voice.onError = (e) => {
-    logEvent('VOICE_SESSION_ERROR', e && e.message);
+    log('VOICE_SESSION_ERROR', e && e.message);
     if (!completed && !assessmentPromptSent) {
       safeSend(ws, { type: 'error', message: 'The voice connection failed. Please try text mode.' });
+      stop('Voice connection failed');
     }
   };
   voice.onClose = () => {
-    logEvent('VOICE_SESSION', 'Voice connection closed.');
+    ready = false;
+    log('VOICE_SESSION', 'Voice connection closed.');
     if (!completed && !assessmentPromptSent) {
       safeSend(ws, { type: 'closed', reason: 'The voice connection was closed.' });
+      ws.close(1000, 'Voice connection closed');
     }
   };
 
@@ -301,7 +357,10 @@ async function attachVoice(ws, interviewId) {
       onMessage: handleServerMessage,
     })
     .then(() => {
+      if (ws.readyState !== 1) { voice.close(); return; }
+      ready = true;
       session.startedAt = Date.now();
+      persistSession();
       safeSend(ws, {
         type: 'ready',
         startedAt: session.startedAt,
@@ -319,13 +378,17 @@ async function attachVoice(ws, interviewId) {
     });
 
   ws.on('message', (raw) => {
+    if (!guard.acceptFrame(raw)) return stop('Voice traffic limit reached');
     let msg;
     try {
       msg = JSON.parse(raw.toString());
     } catch (e) {
-      return;
+      return stop('Invalid voice message');
     }
-    if (!msg) return;
+    if (!guard.acceptMessage(msg)) return stop('Invalid or excessive voice message');
+    // Do not buffer attacker-controlled audio/text while the provider connects.
+    if (!ready && msg.type !== 'ping') return;
+    if (completed || (assessmentPromptSent && !['ping', 'assessmentChoice'].includes(msg.type))) return;
     if (msg.type === 'audio' && msg.data) {
       voice.sendAudio(msg.data, Number(msg.sampleRate) || 16000);
     } else if (msg.type === 'audioEnd') {
@@ -337,14 +400,15 @@ async function attachVoice(ws, interviewId) {
     } else if (msg.type === 'assessmentChoice') {
       if (!assessmentPromptSent) return;
       if (msg.value === 'no') {
-        complete({ skipEval: true });
+        complete({ skipEval: true }).catch(() => ws.close(1011, 'Could not save interview'));
       } else if (msg.value === 'yes') {
-        complete();
+        complete().catch(() => ws.close(1011, 'Could not save interview'));
       }
     }
   });
 
   ws.on('close', () => {
+    clearTimeout(durationTimer);
     persistSession();
     voice.close();
   });
